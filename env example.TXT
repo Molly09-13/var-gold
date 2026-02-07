@@ -1,1 +1,26 @@
+# Telegram
+TG_BOT_TOKEN=
+TG_CHAT_ID=
+TG_ALLOWED_CHAT_IDS=
 
+# AWS / DynamoDB
+AWS_REGION=ap-northeast-1
+DDB_TICKS_TABLE=var_gold_ticks
+DDB_POSITIONS_TABLE=var_gold_positions
+DDB_CONFIG_TABLE=var_gold_config
+DDB_ALERTS_TABLE=var_gold_alerts
+DATA_TTL_DAYS=90
+
+# Strategy
+API_URL=https://omni-client-api.prod.ap-northeast-1.variational.io/metadata/stats
+QUOTE_SIZE=size_100k
+POLL_INTERVAL_SEC=2
+THRESHOLD_OPEN=40
+CLOSE_BUFFER=0
+ANNUAL_FACTOR=365
+REPEAT_ALERT_SEC=300
+CONFIG_REFRESH_SEC=30
+
+# Alerting
+API_FAILURE_ALERT_THRESHOLD=3
+API_FAILURE_ALERT_COOLDOWN=300
