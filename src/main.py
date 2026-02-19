@@ -22,10 +22,17 @@ from .utils import now_utc_ms
 LOGGER = logging.getLogger("var_gold")
 
 
+def _is_truthy_env(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class MonitorService:
     def __init__(self, repo_root: str) -> None:
         self.repo_root = repo_root
         self.base_config = load_runtime_config(repo_root)
+        self.ticks_only_mode = _is_truthy_env(os.getenv("TICKS_ONLY_MODE"))
         self.storage = DynamoStorage(
             region=self.base_config.aws_region,
             ticks_table=self.base_config.ticks_table,
@@ -46,6 +53,8 @@ class MonitorService:
             annual_factor=cfg.annual_factor,
         )
         self.bot = TelegramBot(token=cfg.tg_bot_token, allowed_chat_ids=cfg.tg_allowed_chat_ids)
+        if self.ticks_only_mode:
+            LOGGER.info("ticks-only mode enabled: skipping config/position DynamoDB tables")
 
         self.api_failure_count = 0
         self.last_api_failure_alert_ts = 0
@@ -58,12 +67,16 @@ class MonitorService:
             loop_start = time.monotonic()
             now_ms = now_utc_ms()
 
-            cfg = self.config_store.refresh(now_ms)
+            if self.ticks_only_mode:
+                cfg = self.base_config
+            else:
+                cfg = self.config_store.refresh(now_ms)
             self.collector.annual_factor = cfg.annual_factor
             self.collector.quote_size = cfg.quote_size
             self.bot.update_allowed_chat_ids(cfg.tg_allowed_chat_ids)
 
-            self._poll_bot_commands(cfg, now_ms)
+            if not self.ticks_only_mode:
+                self._poll_bot_commands(cfg, now_ms)
 
             try:
                 snapshot = self.collector.fetch_snapshot()
@@ -113,8 +126,9 @@ class MonitorService:
                 ),
             )
 
-            self.position_manager.process_open_signals(snapshot, cfg, now_ms, self._notify_allowed)
-            self.position_manager.process_close_signals(snapshot, cfg, now_ms, self._notify_allowed)
+            if not self.ticks_only_mode:
+                self.position_manager.process_open_signals(snapshot, cfg, now_ms, self._notify_allowed)
+                self.position_manager.process_close_signals(snapshot, cfg, now_ms, self._notify_allowed)
 
             self._sleep_remaining(loop_start, cfg.poll_interval_sec)
 

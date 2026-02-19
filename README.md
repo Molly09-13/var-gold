@@ -17,6 +17,7 @@ PAXG/XAUT spread monitor with DynamoDB persistence and Telegram trade workflow.
   - `/close` confirmation with actual close spread
 - Dynamic runtime tuning via Telegram `/set` command
 - White-list chat authorization
+- Optional `TICKS_ONLY_MODE=1` to persist only tick data (no config/position tables)
 
 ## Project layout
 
