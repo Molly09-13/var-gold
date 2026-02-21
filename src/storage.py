@@ -8,11 +8,12 @@ from typing import Any, Iterable
 
 try:
     import boto3
-    from boto3.dynamodb.conditions import Attr
+    from boto3.dynamodb.conditions import Attr, Key
     from botocore.exceptions import ClientError
 except ModuleNotFoundError:  # pragma: no cover - dependency check
     boto3 = None
     Attr = None
+    Key = None
 
     class ClientError(Exception):
         pass
@@ -61,6 +62,30 @@ class DynamoStorage:
                 continue
             payload[key] = self._to_ddb_value(value)
         self.ticks_table.put_item(Item=payload)
+
+    def query_ticks(self, pair: str, start_ms: int, end_ms: int) -> list[dict[str, Any]]:
+        if start_ms > end_ms:
+            raise ValueError("start_ms must be <= end_ms")
+        if Key is None:  # pragma: no cover - dependency check
+            raise RuntimeError(
+                "boto3 is required. Install dependencies with: pip install -r requirements.txt"
+            )
+
+        items: list[dict[str, Any]] = []
+        query_kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("pair").eq(pair)
+            & Key("ts_ms").between(Decimal(str(start_ms)), Decimal(str(end_ms))),
+        }
+
+        while True:
+            resp = self.ticks_table.query(**query_kwargs)
+            items.extend(resp.get("Items", []))
+            last_key = resp.get("LastEvaluatedKey")
+            if not last_key:
+                break
+            query_kwargs["ExclusiveStartKey"] = last_key
+
+        return [from_decimal(item) for item in items]
 
     def create_pending_position(
         self,
