@@ -75,8 +75,7 @@ class MonitorService:
             self.collector.quote_size = cfg.quote_size
             self.bot.update_allowed_chat_ids(cfg.tg_allowed_chat_ids)
 
-            if not self.ticks_only_mode:
-                self._poll_bot_commands(cfg, now_ms)
+            self._poll_bot_commands(cfg, now_ms)
 
             try:
                 snapshot = self.collector.fetch_snapshot()
@@ -155,6 +154,13 @@ class MonitorService:
         cmd = parts[0].lower()
 
         try:
+            if self.ticks_only_mode and cmd in {"/positions", "/open", "/close", "/set"}:
+                self.bot.send_message(
+                    chat_id,
+                    "TICKS_ONLY_MODE=1: this command is disabled because position/config tables are not in use.",
+                )
+                return
+
             if cmd in {"/start", "/help"}:
                 self.bot.send_message(chat_id, self._help_text())
                 return
