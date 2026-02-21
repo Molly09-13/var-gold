@@ -50,7 +50,7 @@ HTML = """<!doctype html>
         { label: "spread_close_abs", data: [], borderColor: "#f59e0b", pointRadius: 0, borderWidth: 1.3 },
         { label: "spread_gap", data: [], borderColor: "#22c55e", pointRadius: 0, borderWidth: 1.3 }
       ] },
-      options: { animation: false, parsing: false, scales: { x: { ticks: { color: "#cbd5e1", maxTicksLimit: 8 }, grid: { color: "#334155" } }, y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } } }, plugins: { legend: { labels: { color: "#e2e8f0" } }, title: { display: true, text: "Spread (open/close)", color: "#e2e8f0" } } }
+      options: { animation: false, scales: { x: { ticks: { color: "#cbd5e1", maxTicksLimit: 8 }, grid: { color: "#334155" } }, y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } } }, plugins: { legend: { labels: { color: "#e2e8f0" } }, title: { display: true, text: "Spread (open/close)", color: "#e2e8f0" } } }
     });
 
     const fundingChart = new Chart(fundingCtx, {
@@ -60,7 +60,7 @@ HTML = """<!doctype html>
         { label: "xaut_funding", data: [], borderColor: "#f87171", pointRadius: 0, borderWidth: 1.3 },
         { label: "funding_diff_raw", data: [], borderColor: "#2dd4bf", pointRadius: 0, borderWidth: 1.3 }
       ] },
-      options: { animation: false, parsing: false, scales: { x: { ticks: { color: "#cbd5e1", maxTicksLimit: 8 }, grid: { color: "#334155" } }, y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } } }, plugins: { legend: { labels: { color: "#e2e8f0" } }, title: { display: true, text: "Funding", color: "#e2e8f0" } } }
+      options: { animation: false, scales: { x: { ticks: { color: "#cbd5e1", maxTicksLimit: 8 }, grid: { color: "#334155" } }, y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } } }, plugins: { legend: { labels: { color: "#e2e8f0" } }, title: { display: true, text: "Funding", color: "#e2e8f0" } } }
     });
 
     function applyData(payload) {
