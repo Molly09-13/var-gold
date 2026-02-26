@@ -46,11 +46,10 @@ HTML = """<!doctype html>
     const spreadChart = new Chart(spreadCtx, {
       type: "line",
       data: { labels: [], datasets: [
-        { label: "spread_open", data: [], borderColor: "#60a5fa", pointRadius: 0, borderWidth: 1.3 },
-        { label: "spread_close_abs", data: [], borderColor: "#f59e0b", pointRadius: 0, borderWidth: 1.3 },
-        { label: "spread_gap", data: [], borderColor: "#22c55e", pointRadius: 0, borderWidth: 1.3 }
+        { label: "open_bps", data: [], borderColor: "#60a5fa", pointRadius: 0, borderWidth: 1.3 },
+        { label: "close_bps", data: [], borderColor: "#f59e0b", pointRadius: 0, borderWidth: 1.3 }
       ] },
-      options: { animation: false, scales: { x: { ticks: { color: "#cbd5e1", maxTicksLimit: 8 }, grid: { color: "#334155" } }, y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } } }, plugins: { legend: { labels: { color: "#e2e8f0" } }, title: { display: true, text: "Spread (open/close)", color: "#e2e8f0" } } }
+      options: { animation: false, scales: { x: { ticks: { color: "#cbd5e1", maxTicksLimit: 8 }, grid: { color: "#334155" } }, y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } } }, plugins: { legend: { labels: { color: "#e2e8f0" } }, title: { display: true, text: "Spread (bps)", color: "#e2e8f0" } } }
     });
 
     const fundingChart = new Chart(fundingCtx, {
@@ -68,9 +67,8 @@ HTML = """<!doctype html>
       spreadChart.data.labels = labels;
       fundingChart.data.labels = labels;
 
-      spreadChart.data.datasets[0].data = payload.spread_open;
-      spreadChart.data.datasets[1].data = payload.spread_close_abs;
-      spreadChart.data.datasets[2].data = payload.spread_gap;
+      spreadChart.data.datasets[0].data = payload.open_bps;
+      spreadChart.data.datasets[1].data = payload.close_bps;
 
       fundingChart.data.datasets[0].data = payload.paxg_funding;
       fundingChart.data.datasets[1].data = payload.xaut_funding;
@@ -120,6 +118,29 @@ def _to_label(value: Any) -> str:
     return str(value)
 
 
+def _compute_open_bps(
+    paxg_sell: float | None,
+    xaut_buy: float | None,
+) -> float | None:
+    if paxg_sell is None or xaut_buy is None:
+        return None
+    if paxg_sell == 0:
+        return None
+    return (paxg_sell - xaut_buy) / paxg_sell * 10000
+
+
+def _compute_close_bps(
+    paxg_sell: float | None,
+    xaut_sell: float | None,
+    paxg_buy: float | None,
+) -> float | None:
+    if paxg_sell is None or xaut_sell is None or paxg_buy is None:
+        return None
+    if paxg_sell == 0:
+        return None
+    return (xaut_sell - paxg_buy) / paxg_sell * 10000
+
+
 def read_excel_window(xlsx_path: Path, points: int) -> dict[str, Any]:
     wb = load_workbook(xlsx_path, data_only=True, read_only=True)
     ws = wb["data"]
@@ -129,9 +150,6 @@ def read_excel_window(xlsx_path: Path, points: int) -> dict[str, Any]:
 
     required = [
         "timestamp_utc",
-        "spread_open",
-        "spread_close_abs",
-        "spread_gap",
         "paxg_funding",
         "xaut_funding",
         "funding_diff_raw",
@@ -140,10 +158,19 @@ def read_excel_window(xlsx_path: Path, points: int) -> dict[str, Any]:
     if missing:
         raise ValueError(f"Missing required columns in sheet 'data': {', '.join(missing)}")
 
+    has_bps_cols = "open_bps" in col_index and "close_bps" in col_index
+    if not has_bps_cols:
+        fallback_cols = ["paxg_bid", "xaut_ask", "xaut_bid", "paxg_ask"]
+        missing_fallback = [k for k in fallback_cols if k not in col_index]
+        if missing_fallback:
+            raise ValueError(
+                "Missing required columns for bps view: "
+                + ", ".join(missing_fallback)
+            )
+
     labels = deque(maxlen=points)
-    spread_open = deque(maxlen=points)
-    spread_close_abs = deque(maxlen=points)
-    spread_gap = deque(maxlen=points)
+    open_bps = deque(maxlen=points)
+    close_bps = deque(maxlen=points)
     paxg_funding = deque(maxlen=points)
     xaut_funding = deque(maxlen=points)
     funding_diff_raw = deque(maxlen=points)
@@ -152,9 +179,16 @@ def read_excel_window(xlsx_path: Path, points: int) -> dict[str, Any]:
     for row in rows:
         row_count += 1
         labels.append(_to_label(row[col_index["timestamp_utc"]]))
-        spread_open.append(_to_float(row[col_index["spread_open"]]))
-        spread_close_abs.append(_to_float(row[col_index["spread_close_abs"]]))
-        spread_gap.append(_to_float(row[col_index["spread_gap"]]))
+        if has_bps_cols:
+            open_bps.append(_to_float(row[col_index["open_bps"]]))
+            close_bps.append(_to_float(row[col_index["close_bps"]]))
+        else:
+            paxg_sell = _to_float(row[col_index["paxg_bid"]])
+            xaut_buy = _to_float(row[col_index["xaut_ask"]])
+            xaut_sell = _to_float(row[col_index["xaut_bid"]])
+            paxg_buy = _to_float(row[col_index["paxg_ask"]])
+            open_bps.append(_compute_open_bps(paxg_sell, xaut_buy))
+            close_bps.append(_compute_close_bps(paxg_sell, xaut_sell, paxg_buy))
         paxg_funding.append(_to_float(row[col_index["paxg_funding"]]))
         xaut_funding.append(_to_float(row[col_index["xaut_funding"]]))
         funding_diff_raw.append(_to_float(row[col_index["funding_diff_raw"]]))
@@ -164,9 +198,8 @@ def read_excel_window(xlsx_path: Path, points: int) -> dict[str, Any]:
         "file_path": str(xlsx_path),
         "row_count": row_count,
         "labels": list(labels),
-        "spread_open": list(spread_open),
-        "spread_close_abs": list(spread_close_abs),
-        "spread_gap": list(spread_gap),
+        "open_bps": list(open_bps),
+        "close_bps": list(close_bps),
         "paxg_funding": list(paxg_funding),
         "xaut_funding": list(xaut_funding),
         "funding_diff_raw": list(funding_diff_raw),

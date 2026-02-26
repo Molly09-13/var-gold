@@ -83,9 +83,9 @@ def write_excel(path: str, rows: list[dict[str, Any]]) -> None:
     columns = [
         ("timestamp_utc", "ts_utc"),
         ("ts_ms", "ts_ms"),
+        ("open_bps", "open_bps"),
+        ("close_bps", "close_bps"),
         ("spread_open", "spread_open"),
-        ("spread_close_abs", "spread_close_abs"),
-        ("spread_gap", "spread_gap"),
         ("spread_close", "spread_close"),
         ("paxg_funding", "paxg_funding"),
         ("xaut_funding", "xaut_funding"),
@@ -112,17 +112,25 @@ def write_excel(path: str, rows: list[dict[str, Any]]) -> None:
     excel_epoch = datetime(1899, 12, 30)
 
     def get_value(item: dict[str, Any], key: str) -> Any:
-        if key == "spread_close_abs":
-            raw = item.get("spread_close")
-            if raw is None:
+        if key == "open_bps":
+            paxg_sell = item.get("paxg_bid")
+            xaut_buy = item.get("xaut_ask")
+            if paxg_sell is None or xaut_buy is None:
                 return None
-            return abs(float(raw))
-        if key == "spread_gap":
-            open_raw = item.get("spread_open")
-            close_raw = item.get("spread_close")
-            if open_raw is None or close_raw is None:
+            denom = float(paxg_sell)
+            if denom == 0:
                 return None
-            return abs(float(close_raw)) - float(open_raw)
+            return (float(paxg_sell) - float(xaut_buy)) / denom * 10000
+        if key == "close_bps":
+            paxg_sell = item.get("paxg_bid")
+            xaut_sell = item.get("xaut_bid")
+            paxg_buy = item.get("paxg_ask")
+            if paxg_sell is None or xaut_sell is None or paxg_buy is None:
+                return None
+            denom = float(paxg_sell)
+            if denom == 0:
+                return None
+            return (float(xaut_sell) - float(paxg_buy)) / denom * 10000
         return item.get(key)
 
     def percentile(values: list[float], p: float) -> float | None:
@@ -138,7 +146,7 @@ def write_excel(path: str, rows: list[dict[str, Any]]) -> None:
             return sorted_vals[int(k)]
         return sorted_vals[f] + (sorted_vals[c] - sorted_vals[f]) * (k - f)
 
-    stats_keys = ["spread_open", "spread_close_abs", "spread_gap"]
+    stats_keys = ["open_bps", "close_bps"]
     stats_values: dict[str, list[float]] = {key: [] for key in stats_keys}
 
     for row_idx, item in enumerate(rows, start=1):
@@ -194,17 +202,16 @@ def write_excel(path: str, rows: list[dict[str, Any]]) -> None:
             )
 
         spread_chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
-        spread_chart.set_title({"name": "Spread (open/close)"})
+        spread_chart.set_title({"name": "Spread (bps)"})
         spread_chart.set_x_axis(axis_common)
         spread_chart.set_y_axis(
-            {"name": "Spread", "major_gridlines": {"visible": True, "line": {"color": "#E5E7EB"}}}
+            {"name": "bps", "major_gridlines": {"visible": True, "line": {"color": "#E5E7EB"}}}
         )
         spread_chart.set_legend({"position": "bottom"})
         spread_chart.set_plotarea({"border": {"none": True}})
 
-        add_series(spread_chart, "spread_open", "#3B82F6")
-        add_series(spread_chart, "spread_close_abs", "#EF4444")
-        add_series(spread_chart, "spread_gap", "#F59E0B")
+        add_series(spread_chart, "open_bps", "#3B82F6")
+        add_series(spread_chart, "close_bps", "#EF4444")
 
         funding_chart = workbook.add_chart({"type": "scatter", "subtype": "straight"})
         funding_chart.set_title({"name": "Funding"})
