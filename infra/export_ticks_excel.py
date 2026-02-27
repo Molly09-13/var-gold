@@ -72,7 +72,7 @@ def build_output_path(args: argparse.Namespace, start_dt: datetime, end_dt: date
     return os.path.join(REPO_ROOT, filename)
 
 
-def write_excel(path: str, rows: list[dict[str, Any]]) -> None:
+def write_excel(path: str, rows: list[dict[str, Any]], include_charts: bool = True) -> None:
     workbook = xlsxwriter.Workbook(path, {"remove_timezone": True})
     data_ws = workbook.add_worksheet("data")
     chart_ws = workbook.add_worksheet("charts")
@@ -179,7 +179,9 @@ def write_excel(path: str, rows: list[dict[str, Any]]) -> None:
                 stats_values[key].append(float(val))
 
     last_row = len(rows)
-    if last_row > 0:
+    if not include_charts:
+        chart_ws.write("A1", "Charts disabled in live export mode.")
+    elif last_row > 0:
         col_map = {key: idx for idx, (_, key) in enumerate(columns)}
         time_col = col_map["ts_utc"]
 
